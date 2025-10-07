@@ -1,0 +1,237 @@
+// SevenAI Pro - Professional AI Video Editor Platform
+// Database Schema for Video Editor Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// User Management
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  name              String?
+  avatar            String?
+  password          String?
+  emailVerified     DateTime?
+  provider          String?   @default("email") // email, google, apple
+  providerId        String?
+  role              UserRole  @default(USER)
+  status            UserStatus @default(ACTIVE)
+  subscriptionPlan  String?   @default("BASIC")
+  subscriptionEnds  DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  videos            Video[]
+  projects          Project[]
+  payments          Payment[]
+  activityLogs      ActivityLog[]
+  notifications     Notification[]
+  sessions          Session[]
+
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  token        String   @unique
+  refreshToken String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// Video & Project Management
+model Project {
+  id          String      @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  thumbnail   String?
+  duration    Int?        // in seconds
+  status      ProjectStatus @default(DRAFT)
+  settings    Json?       // project settings
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  videos Video[]
+
+  @@map("projects")
+}
+
+model Video {
+  id           String      @id @default(cuid())
+  userId       String
+  projectId    String?
+  originalName String
+  fileName     String
+  filePath     String
+  fileSize     Int         // in bytes
+  duration     Int         // in seconds
+  resolution   String?     // e.g., "1920x1080"
+  format       String?     // e.g., "mp4", "mov"
+  status       VideoStatus @default(UPLOADING)
+  thumbnail    String?
+  processedAt  DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@map("videos")
+}
+
+// Payment & Subscription
+model Payment {
+  id            String      @id @default(cuid())
+  userId        String
+  amount        Float
+  currency      String      @default("IDR")
+  method        PaymentMethod
+  status        PaymentStatus @default(PENDING)
+  type          PaymentType @default(SUBSCRIPTION)
+  plan          String      // BASIC, PRO, PREMIUM
+  duration      String      // monthly, yearly
+  transactionId String?     @unique
+  paymentUrl    String?
+  paidAt        DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+// Activity & Monitoring
+model ActivityLog {
+  id          String       @id @default(cuid())
+  userId      String
+  action      ActivityType
+  resource    String?      // video, project, payment, etc.
+  resourceId  String?
+  metadata    Json?        // additional data
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("activity_logs")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      NotificationType
+  read      Boolean          @default(false)
+  metadata  Json?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// System Settings
+model SystemSetting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
+}
+
+// Enums
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  TRIAL
+}
+
+enum ProjectStatus {
+  DRAFT
+  PROCESSING
+  COMPLETED
+  FAILED
+  ARCHIVED
+}
+
+enum VideoStatus {
+  UPLOADING
+  PROCESSING
+  COMPLETED
+  FAILED
+  DELETED
+}
+
+enum PaymentMethod {
+  QRIS
+  MOBILE_BANKING
+  CREDIT_CARD
+  EWALLET
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  EXPIRED
+  REFUNDED
+}
+
+enum PaymentType {
+  SUBSCRIPTION
+  ONE_TIME
+  CREDITS
+}
+
+enum ActivityType {
+  LOGIN
+  LOGOUT
+  UPLOAD_VIDEO
+  EDIT_VIDEO
+  EXPORT_VIDEO
+  DELETE_VIDEO
+  CREATE_PROJECT
+  UPDATE_PROJECT
+  DELETE_PROJECT
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  SUBSCRIPTION_UPGRADE
+  SUBSCRIPTION_DOWNGRADE
+  ACCOUNT_CREATED
+  ACCOUNT_UPDATED
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+  PAYMENT
+  SYSTEM
+}
